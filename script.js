@@ -1,179 +1,141 @@
   function generate() {
-    // Get input values
-    const charLimit = parseInt(document.getElementById('chars').value);
-    const phraseMax = parseInt(document.getElementById('phrase').value);
-
-    // Build regex for unwanted words (validated input)
-    const unwanted = document.getElementById('unwanted').value;
-    const unwantedRegex = new RegExp(`\\b(${unwanted.replace(/\|/g, '|')})\\b`, 'g');
-
-    // Process input text
-    let text = document.getElementById('input').value.toLowerCase()
-      .replace(/[.,\/#!$%\^&\*;: {} = \_`~()+]/g, ' ') // remove punctuation
-      .replace(/\s+/g, ' '); // replace multiple spaces with single space
-
-    // Separate phrases and remove unwanted words and empty elements
-    let output = [];
-    let phrases = [];
-    let words = [];
-    while (text.length > 0) {
-      const match = text.match(/".*?"/); // find first phrase
-      if (match) {
-        phrases.push(match[0].slice(1, -1)); // remove quotes from phrase
-        text = text.replace(match[0], ''); // remove phrase from text
-      } else {
-        const word = text.split(' ', 1)[0]; // get first word
-        if (!unwantedRegex.test(word) && word.length > 0) {
-          words.push(word);
-        }
-        text = text.slice(word.length + 1); // remove first word from text
-      }
-    }
-
-    // Remove duplicate words
-    words = [...new Set(words)]; // use spread syntax for unique set
-
-    // Generate all possible combinations of words
-    const possiblePhrases = [];
-    function generateCombinations(words, currentPhrase, remainingWords) {
-      if (remainingWords.length === 0) {
-        possiblePhrases.push(currentPhrase.slice()); // copy the phrase
-        return;
-      }
-
-      for (let i = 0; i < remainingWords.length; i++) {
-        const word = remainingWords[i];
-        currentPhrase.push(word);
-        generateCombinations(words, currentPhrase, remainingWords.slice(i + 1));
-        currentPhrase.pop(); // backtrack
-      }
-    }
-
-    generateCombinations(words, [], words);
-
-
-    while (output.length < phraseMax) {
-      let currentLine = [];
-      let remainingChars = charLimit;
-      let swappableIndex = -1; // Initialize swappableIndex here
-      
-
-      while (possiblePhrases.length > 0 && remainingChars > 0) {
-        let bestFitPhrase = null;
-        let bestFitRemainingChars = -Infinity;
-
-        // Explore all remaining phrases
-        for (let i = 0; i < possiblePhrases.length; i++) {
-          const phrase = possiblePhrases[i];
-          const phraseLength = phrase.join(' ').length;
-
-          // Check if it fits and doesn't contain used words
-          if (phraseLength <= remainingChars && !currentLine.some(word => phrase.includes(word))) {
-            // Check for potential swap for better fit
-            let swappableIndex = -1;
-            for (let j = 0; j < currentLine.length; j++) {
-              const swapPhrase = currentLine[j];
-              if (remainingChars - phraseLength + swapPhrase.length > bestFitRemainingChars) {
-                swappableIndex = j;
-                bestFitRemainingChars = remainingChars - phraseLength + swapPhrase.length;
-              }
-            }
-
-            // Update best fit if applicable
-            if (swappableIndex !== -1 || phraseLength > bestFitRemainingChars) {
-              bestFitPhrase = phrase;
-              if (swappableIndex !== -1) {
-                bestFitRemainingChars = remainingChars - phraseLength + currentLine[swappableIndex].length;
-              } else {
-                bestFitRemainingChars = remainingChars - phraseLength;
-              }
-            }
-          }
-        }
-
-        // Add best fit phrase if found
-        if (bestFitPhrase) {
-          if (swappableIndex !== -1) {
-            currentLine[swappableIndex] = bestFitPhrase;
-          } else {
-            currentLine.push(bestFitPhrase);
-          }
-          remainingChars = bestFitRemainingChars;
-          possiblePhrases.splice(possiblePhrases.indexOf(bestFitPhrase), 1);
-        } else {
-          break; // No more fitting phrases found for this line
-        }
-      }
-
-      // Add completed line to output and reset for next line
-      if (currentLine.length > 0) {
-        output.push(currentLine.join(' '));
-      }
-      currentLine = [];
-      remainingChars = charLimit;
-    }
-
-    // Handle remaining unused words:
-    if (possiblePhrases.length > 0) {
-      // Add all remaining phrases to the last line, separated by spaces
-      output[output.length - 1] += ' ' + possiblePhrases.join(' ');
-    }
-
-    // Generate output text and display results
-    const outputText = output.join('\n');
-    console.log(outputText);
-
-  document.getElementById('output').value = outputText;
-
-  // Find unused words (excluding phrases in quotes)
-  const unused = words.filter(word => !output.flat().includes(word) && !phrases.includes(word));
-  console.log(unused);
-  document.getElementById('wordBox').value = unused.join('\n');
+	// get input values
+	let charLimit = document.getElementById('chars').value;
+	let phraseMax = document.getElementById('phrase').value;
+	// build regex for unwanted words
+	// NOTE: ideally input should be validated making sure there are no spaces
+	// and all words are separated with "|"
+	let unwanted = document.getElementById('unwanted').value.replace(/\|/g, '\\b|');
+	let unwantedRegex = new RegExp('\\b(' + unwanted + ')', 'g');
+	// Get input
+	let words = document.getElementById('input').value.toLowerCase() // convert to lowercase
+		.replace(/[.,\/#!$%\^&\*;: {} = \_`~()+]/g, ' ') // remove punctuation
+		.replace(/\s+/g, ' ');
+	// replace new lines, multiple spaces with single space
+	// Separate out phrases (wrapped in double quotes) to new array
+	let phrases = words.match(/".*?"/g);
+	words = words.replace(/".*?"/g, ' ') // remove phrases (anything in double quotes)
+		.replace(unwantedRegex, ' ') // next remove any connecting words (and,the,etc.)
+		.replace(/\s+/g, ' ');
+	// and replace multiple spaces / new lines again
+	words = words.split(' ');
+	// make into array
+	console.log(words.length);
+	// Strip out the double quotes from the array values
+	if (phrases) {
+		phrases = phrases.map(function(el) {
+			return el.replace(/^"|"$/g, '');
+		});
+		// Combine words and phrases arrays into single array (starting with phrases)
+		words = phrases.concat(words);
+	}
+	words = words.filter((word, index) => words.indexOf(word) === index);
+	//Remove duplicate words
+	//words = words.filter( word => word.length <= charLimit);
+	words = words.filter(function(el) {
+		return el != '';
+	});
+	// remove any empty elements
+	// ********
+	//*******Unique words list generated above
+	// ********Tag generation below
+	//********
+	let everyCombo = generateLists(words, charLimit);
+	let possiblePhrases = everyCombo.filter(value => value.length <= charLimit);
+	possiblePhrases.sort(function(a, b) {
+		return b.length - a.length;
+	});
+	let output = [];
+	for (let phrases in possiblePhrases) {
+		possiblePhrases[phrases] = possiblePhrases[phrases].split(' ');
+	}
+	output[0] = possiblePhrases[0];
+	possiblePhrases = possiblePhrases.splice(1, possiblePhrases.length + 1);
+	while (!checkComplete(words, output, phraseMax)) {
+		let condensed = [];
+		condensed = [].concat(...output);
+		for (let i in possiblePhrases) {
+			if (possiblePhrases[i].filter(x => condensed.includes(x)).length == 0) {
+				output.push(possiblePhrases[i]);
+				break;
+			} else {
+				possiblePhrases.slice(i, 1);
+			}
+		}
+	}
+	let outputText = '';
+	output.forEach(n => {
+		if (n) {
+			outputText += n.join(' ') + '\n';
+		}
+	});
+	console.log(outputText);
+	document.getElementById('output').value = outputText;
+	// show words that weren't used in tags
+	//*Bug* Words in quotation marks will show up in the Unused Words box even when they are used.
+	let output1 = output.toString() //convert from array to a string
+		.replace(/ /g, ',') //replace spaces with commas
+		.split(',');
+	//convert back to an array
+	let unused = words.filter(function(el) {
+		return output1.indexOf(el) < 0;
+	});
+	console.log(unused);
+	console.log(words);
+	clean = unused.forEach(function(item) {
+		document.getElementById('wordBox').value += item + '\n';
+	});
+	let comma = document.getElementById('output').value;
+	let tagArray = comma.split('\n');
+	tagArray.forEach(item => {
+		const tagString = tagArray.join(item + ', \n');
+		document.getElementById('output').value = tagString.substring(0, tagString.length - 3);
+	});
 }
-
+//******** main generate function above, other named functions below
 function generateLists(words, charLimit) {
-  const result = [];
-  for (let i = 0; i < words.length; i++) {
-    const word = words[i];
-    if (word.length <= charLimit) {
-      result.push([word]);
-    } else {
-      const remainingWords = words.slice(i + 1);
-      const subCombinations = generateLists(remainingWords, charLimit - word.length);
-      subCombinations.forEach(combination => result.push([word, ...combination]));
-    }
-  }
-  return result;
+	var result = [];
+	var f = function(prefix, words) {
+		var newWord;
+		for (var i = 0; i < words.length; i++) {
+			// append prefix if not empty
+			newWord = prefix.length > 0 ? prefix + ' ' + words[i] : words[i];
+			// only push to result array if charLimit not exceeded
+			if (newWord.length <= charLimit) {
+				result.push(newWord);
+				f(newWord, words.slice(i + 1));
+			}
+		}
+	}
+	f('', words);
+	return result;
 }
-
-// (rest of the code remains unchanged)
-
 
 function checkComplete(unique, outputArray, phraseMax) {
-  if (outputArray.length >= phraseMax) {
-    return true;
-  }
-  let count = 0;
-  outputArray.forEach(n => {
-    if (n) {
-      count += n.length;
-    }
-  });
-  return unique.length <= count;
+	if (outputArray.length >= phraseMax) {
+		return true;
+	}
+	let count = 0;
+	outputArray.forEach(n => {
+		if (n) {
+			count += n.length;
+		}
+	});
+	return unique.length <= count;
 }
 
 function removeDuplicates(words) {
-  var seen = {}
-  var out = [];
-  var j = 0;
-  for (var i = 0; i < words.length; i++) {
-    var item = words[i];
-    if (seen[item] !== 1) {
-      seen[item] = 1;
-      out[j++] = item;
-    }
-  }
-  return out;
+	var seen = {}
+	var out = [];
+	var j = 0;
+	for (var i = 0; i < words.length; i++) {
+		var item = words[i];
+		if (seen[item] !== 1) {
+			seen[item] = 1;
+			out[j++] = item;
+		}
+	}
+	return out;
 }
 // Get the modal
 const modal = document.getElementById('insModal');
@@ -191,27 +153,27 @@ span.onclick = close;
 insImage.onclick = close;
 
 function defaultValues() {
-  document.getElementById('input').value = '';
-  document.getElementById('output').value = '';
-  document.getElementById('wordBox').value = '';
-  document.getElementById('chars').value = 20;
-  document.getElementById('phrase').value = 13;
-  document.getElementById('unwanted').value = 'a|at|and|of|the|in|on|an|has|to|it|is|if|this|that|or|by|for|with';
+	document.getElementById('input').value = '';
+	document.getElementById('output').value = '';
+	document.getElementById('wordBox').value = '';
+	document.getElementById('chars').value = 20;
+	document.getElementById('phrase').value = 13;
+	document.getElementById('unwanted').value = 'a|at|and|of|the|in|on|an|has|to|it|is|if|this|that|or|by|for|with';
 }
 // function copyToClipboard(element)
 {
-  // const $temp = $('<input>');
-  // $('body').append($temp);
-  // $temp.val($(element).text()).select();
-  // document.execCommand('copy');
-  // $temp.remove();
-  //
+	// const $temp = $('<input>');
+	// $('body').append($temp);
+	// $temp.val($(element).text()).select();
+	// document.execCommand('copy');
+	// $temp.remove();
+	//
 }
 
 function copyOutput() {
-  const copyText = document.getElementById('output');
-  copyText.select();
-  copyText.setSelectionRange(0, 99999);
-  navigator.clipboard.writeText(copyText.value);
-  document.getElementById('copyTags').innerHTML = 'Copied!';
-};
+	const copyText = document.getElementById('output');
+	copyText.select();
+	copyText.setSelectionRange(0, 99999);
+	navigator.clipboard.writeText(copyText.value);
+	document.getElementById('copyTags').innerHTML = 'Copied!';
+}
